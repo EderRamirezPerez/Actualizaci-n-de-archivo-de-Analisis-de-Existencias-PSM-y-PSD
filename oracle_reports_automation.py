@@ -79,7 +79,7 @@ def iniciar_sesion():
     print("✅ Idioma a español")
 
     driver.find_element(By.NAME, "userid").send_keys("Eder.Ramirez")
-    driver.find_element(By.NAME, "password").send_keys(os.environ["Oracle_Key"])
+    driver.find_element(By.NAME, "password").send_keys(os.environ["ORACLE_KEY"])
     driver.find_element(By.NAME, "password").send_keys(Keys.RETURN)
     time.sleep(10)
     print("✅ Sesión iniciada")
