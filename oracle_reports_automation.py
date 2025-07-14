@@ -2,7 +2,7 @@
 """
 Descarga diaria de reportes Oracle BI, los mueve a una carpeta local
 y limpia duplicados.  Necesita la variable de entorno ORACLE_KEY
-con tu contraseña antes de ejecutarse (se define en GitHub Secrets).
+(defínela como secreto en GitHub → Settings → Secrets → Actions).
 """
 
 import os
@@ -19,39 +19,39 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
-# 📂 Carpetas locales (relativas al repo)
-DOWNLOAD_DIR = "downloads"                                  # donde Chrome descargará los CSV
-DESTINO_DIR  = os.path.join("outputs", "Reporte Existencia")  # destino final
+# ▸ Carpetas locales (relativas al repo)
+DOWNLOAD_DIR = "downloads"                                   # aquí Chrome deja los CSV
+DESTINO_DIR  = os.path.join("outputs", "Reporte Existencia") # destino final
 
-# Crea las carpetas si no existen
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 os.makedirs(DESTINO_DIR,  exist_ok=True)
 
 MAX_INTENTOS_DEFAULT     = 3
-TIMEOUT_DESCARGA_DEFAULT = 40  # seg
+TIMEOUT_DESCARGA_DEFAULT = 40  # s
 
-# Configurar Chrome
+# ▸ Configurar Chrome/Driver
 prefs = {
     "download.default_directory": os.path.abspath(DOWNLOAD_DIR),
     "download.prompt_for_download": False,
     "download.directory_upgrade": True,
     "safebrowsing.enabled": True,
 }
+
 chrome_options = Options()
 chrome_options.add_experimental_option("prefs", prefs)
 chrome_options.add_argument("--headless")
 chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--disable-dev-shm-usage")
 
-driver        = webdriver.Chrome(service=Service(), options=chrome_options)
-wait_global   = WebDriverWait(driver, 30)
+driver      = webdriver.Chrome(service=Service(), options=chrome_options)
+wait_global = WebDriverWait(driver, 30)
 
-# ──────────────────────────────────────────────────────────────────────────────
-def _descarga_exitosa(antes, timeout):
+# ─────────────────────────────────────────────────────────────
+def _descarga_exitosa(prev, timeout):
     inicio = time.time()
     while time.time() - inicio < timeout:
-        nuevos       = {f for f in os.listdir(DOWNLOAD_DIR) if f.endswith('.csv')} - antes
-        en_progreso  = [f for f in os.listdir(DOWNLOAD_DIR) if f.endswith('.crdownload')]
+        nuevos      = {f for f in os.listdir(DOWNLOAD_DIR) if f.endswith(".csv")} - prev
+        en_progreso = [f for f in os.listdir(DOWNLOAD_DIR) if f.endswith(".crdownload")]
         if nuevos and not en_progreso:
             return True
         time.sleep(2)
@@ -60,7 +60,7 @@ def _descarga_exitosa(antes, timeout):
 
 def _limpiar_descargas_parciales():
     for f in os.listdir(DOWNLOAD_DIR):
-        if f.endswith('.crdownload'):
+        if f.endswith(".crdownload"):
             try:
                 os.remove(os.path.join(DOWNLOAD_DIR, f))
             except OSError:
@@ -75,7 +75,7 @@ def iniciar_sesion():
     time.sleep(2)
     driver.execute_script("callLanguageChange();")
     time.sleep(5)
-    print("✅ Idioma establecido en español")
+    print("✅ Idioma puesto en español")
 
     driver.find_element(By.NAME, "userid").send_keys("Eder.Ramirez")
     driver.find_element(By.NAME, "password").send_keys(os.environ["ORACLE_KEY"])
@@ -110,17 +110,21 @@ def descargar_multiples_reportes():
 
         for intento in range(1, intentos_max + 1):
             print(f"   ▶ Intento {intento}/{intentos_max}")
-            prev_csv = {f for f in os.listdir(DOWNLOAD_DIR) if f.endswith('.csv')}
+            prev_csv = {f for f in os.listdir(DOWNLOAD_DIR) if f.endswith(".csv")}
             try:
                 driver.execute_script(f"window.open('{url}', '_blank');")
                 time.sleep(2)
                 driver.switch_to.window(driver.window_handles[-1])
 
                 wait_local.until(EC.presence_of_element_located((By.CLASS_NAME, "ResultLinksCell")))
-                ActionChains(driver).move_to_element(driver.find_element(By.CLASS_NAME, "ResultLinksCell")).perform()
+                ActionChains(driver).move_to_element(
+                    driver.find_element(By.CLASS_NAME, "ResultLinksCell")
+                ).perform()
 
                 def click(sel):
-                    ActionChains(driver).move_to_element(wait_local.until(EC.element_to_be_clickable(sel))).click().perform()
+                    ActionChains(driver).move_to_element(
+                        wait_local.until(EC.element_to_be_clickable(sel))
+                    ).click().perform()
 
                 click((By.LINK_TEXT, "Exportar"))
                 click((By.XPATH, "//td[contains(text(),'Datos')]"))
@@ -147,12 +151,12 @@ def descargar_multiples_reportes():
     if fallidos:
         with open("errores_descarga.csv", "w", newline="", encoding="utf-8") as f:
             csv.writer(f).writerows([[e] for e in fallidos])
-        print("⚠️ Ver 'errores_descarga.csv'")
+        print("⚠️ Revisa 'errores_descarga.csv'")
 
 
-def mover_a_directorio():
+def mover_a_destino():
     print("\n🔄 Moviendo CSV a carpeta destino…")
-    for f in [x for x in os.listdir(DOWNLOAD_DIR) if x.endswith('.csv')]:
+    for f in [x for x in os.listdir(DOWNLOAD_DIR) if x.endswith(".csv")]:
         shutil.move(os.path.join(DOWNLOAD_DIR, f), os.path.join(DESTINO_DIR, f))
         print(f"   📁 {f}")
 
@@ -174,8 +178,12 @@ def limpiar_duplicados():
     patron = re.compile(r"^(?P<base>.+?) \((?P<num>\d+)\)\.csv$")
 
     for base in bases:
-        original  = f"{base}.csv"
-        archivos  = [f for f in os.listdir(DESTINO_DIR) if f.startswith(base) and f.endswith('.csv')]
+        original = f"{base}.csv"
+        archivos = [
+            f
+            for f in os.listdir(DESTINO_DIR)
+            if f.startswith(base) and f.endswith(".csv")
+        ]
         if not archivos:
             continue
 
@@ -190,7 +198,10 @@ def limpiar_duplicados():
                 key=lambda x: int(patron.match(x).group("num")),
             )
             conservar = duplicados.pop(0)
-            os.rename(os.path.join(DESTINO_DIR, conservar), os.path.join(DESTINO_DIR, original))
+            os.rename(
+                os.path.join(DESTINO_DIR, conservar),
+                os.path.join(DESTINO_DIR, original),
+            )
             print(f"   🔄 {conservar} ➜ {original}")
             for f in duplicados:
                 os.remove(os.path.join(DESTINO_DIR, f))
@@ -201,7 +212,7 @@ def limpiar_duplicados():
 def ejecutar_proceso():
     iniciar_sesion()
     descargar_multiples_reportes()
-    mover_a_directorio()
+    mover_a_destino()
     limpiar_duplicados()
 
 
