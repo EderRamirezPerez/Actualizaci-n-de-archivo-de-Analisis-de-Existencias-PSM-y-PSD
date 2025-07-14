@@ -2,16 +2,16 @@ name: Oracle Reports Automation
 
 on:
   schedule:
-    # 13:00 UTC = 07:00 h CDMX (lun-vie)
+    # 13:00 UTC = 07:00 CDMX (lunes-viernes)
     - cron: '0 13 * * 1-5'
-  workflow_dispatch:       # permite lanzarlo manualmente
+  workflow_dispatch:       # permite lanzarlo manualmente desde la pestaña Actions
 
 jobs:
   run-oracle-reports:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. Traer el código del repo
+    # 1. Clonar el repositorio
     - name: Checkout repository
       uses: actions/checkout@v4
 
@@ -21,27 +21,25 @@ jobs:
       with:
         python-version: '3.11'
 
-    # 3. Instalar dependencias listadas en requirements.txt
+    # 3. Instalar dependencias declaradas en requirements.txt
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    # 4. Instalar Google Chrome estable
+    # 4. Instalar Google Chrome (versión estable)
     - name: Set up Google Chrome
-      uses: browser-actions/setup-chrome@v1
-      with:
-        chrome-version: stable   # puedes fijar otra versión si lo necesitas
+      uses: browser-actions/setup-chrome@v1          # ↓ “stable” por defecto
+      # with:
+      #   chrome-version: stable                     # (opcional: fija otra versión)
 
-    # 5. Instalar ChromeDriver compatible
+    # 5. Instalar ChromeDriver compatible con la versión de Chrome instalada
     - name: Set up ChromeDriver
-      uses: nanasess/setup-chromedriver@v2
-      with:
-        chromedriver-version: latest
+      uses: browser-actions/setup-chromedriver@v1    # auto-detecta la versión de Chrome
 
-    # 6. Ejecutar tu script de automatización
+    # 6. Ejecutar el script de automatización
     - name: Run Oracle automation script
       env:
-        ORACLE_KEY: ${{ secrets.ORACLE_KEY }}   # contraseña guardada en Secrets
+        ORACLE_KEY: ${{ secrets.ORACLE_KEY }}        # contraseña guardada en “Secrets → Actions”
       run: |
         python oracle_reports_automation.py
