@@ -1,9 +1,8 @@
-
 # -*- coding: utf-8 -*-
 """
-Descarga diaria de reportes Oracle BI, los mueve a Google Drive y
-limpia duplicados. Requiere que la variable de entorno ORACLE_KEY
-esté definida antes de ejecutar (ver celda de lectura de mapeo.txt).
+Descarga diaria de reportes Oracle BI, los mueve a una carpeta local
+y limpia duplicados.  Necesita la variable de entorno ORACLE_KEY
+con tu contraseña antes de ejecutarse (se define en GitHub Secrets).
 """
 
 import os
@@ -19,40 +18,40 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from google.colab import drive  # mantiene compatibilidad con Colab
 
-# 0️⃣  Montar Drive
-drive.mount('/content/drive')
+# 📂 Carpetas locales (relativas al repo)
+DOWNLOAD_DIR = "downloads"                                  # donde Chrome descargará los CSV
+DESTINO_DIR  = os.path.join("outputs", "Reporte Existencia")  # destino final
 
-DOWNLOAD_DIR = "/content/"
-DESTINO_DRIVE = "/content/drive/My Drive/Reporte Existencia"
+# Crea las carpetas si no existen
+os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+os.makedirs(DESTINO_DIR,  exist_ok=True)
 
-MAX_INTENTOS_DEFAULT = 3
+MAX_INTENTOS_DEFAULT     = 3
 TIMEOUT_DESCARGA_DEFAULT = 40  # seg
 
 # Configurar Chrome
 prefs = {
-    "download.default_directory": DOWNLOAD_DIR,
+    "download.default_directory": os.path.abspath(DOWNLOAD_DIR),
     "download.prompt_for_download": False,
     "download.directory_upgrade": True,
-    "safebrowsing.enabled": True
+    "safebrowsing.enabled": True,
 }
-
 chrome_options = Options()
 chrome_options.add_experimental_option("prefs", prefs)
 chrome_options.add_argument("--headless")
 chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--disable-dev-shm-usage")
 
-driver = webdriver.Chrome(service=Service(), options=chrome_options)
-wait_global = WebDriverWait(driver, 30)
+driver        = webdriver.Chrome(service=Service(), options=chrome_options)
+wait_global   = WebDriverWait(driver, 30)
 
-
+# ──────────────────────────────────────────────────────────────────────────────
 def _descarga_exitosa(antes, timeout):
     inicio = time.time()
     while time.time() - inicio < timeout:
-        nuevos = {f for f in os.listdir(DOWNLOAD_DIR) if f.endswith('.csv')} - antes
-        en_progreso = [f for f in os.listdir(DOWNLOAD_DIR) if f.endswith('.crdownload')]
+        nuevos       = {f for f in os.listdir(DOWNLOAD_DIR) if f.endswith('.csv')} - antes
+        en_progreso  = [f for f in os.listdir(DOWNLOAD_DIR) if f.endswith('.crdownload')]
         if nuevos and not en_progreso:
             return True
         time.sleep(2)
@@ -76,7 +75,7 @@ def iniciar_sesion():
     time.sleep(2)
     driver.execute_script("callLanguageChange();")
     time.sleep(5)
-    print("✅ Idioma a español")
+    print("✅ Idioma establecido en español")
 
     driver.find_element(By.NAME, "userid").send_keys("Eder.Ramirez")
     driver.find_element(By.NAME, "password").send_keys(os.environ["ORACLE_KEY"])
@@ -96,15 +95,15 @@ def descargar_multiples_reportes():
         "Orden de Transferencia": "https://eisq.fa.us6.oraclecloud.com/analytics/saw.dll?PortalGo&Action=prompt&path=%2Fshared%2FCustom%2FPacksys%2FCompras%2FEnvios%2FOrden%20de%20Transferencia",
         "Orden de Transferencia maquinas": "https://eisq.fa.us6.oraclecloud.com/analytics/saw.dll?PortalGo&Action=prompt&path=%2Fshared%2FCustom%2FPacksys%2FCompras%2FAnalisis%2FOrden%20de%20Transferencia%20maquinas",
         "Existencia maquinas": "https://eisq.fa.us6.oraclecloud.com/analytics/saw.dll?PortalGo&Action=prompt&path=%2Fshared%2FCustom%2FPacksys%2FCompras%2FAnalisis%2FExistencia%20maquinas",
-        "Reporte de Transacciones de Venta": "https://eisq.fa.us6.oraclecloud.com/analytics/saw.dll?PortalGo&Action=prompt&path=%2Fshared%2FCustom%2FPacksys%2FCompras%2FAnalisis%2FReporte%20de%20Transacciones%20de%20Venta"
+        "Reporte de Transacciones de Venta": "https://eisq.fa.us6.oraclecloud.com/analytics/saw.dll?PortalGo&Action=prompt&path=%2Fshared%2FCustom%2FPacksys%2FCompras%2FAnalisis%2FReporte%20de%20Transacciones%20de%20Venta",
     }
 
     fallidos = []
 
     for nombre, url in urls.items():
-        intentos_max = 5 if nombre == "Detalle de Ordenes de Venta" else MAX_INTENTOS_DEFAULT
+        intentos_max   = 5 if nombre == "Detalle de Ordenes de Venta" else MAX_INTENTOS_DEFAULT
         timeout_archiv = 80 if nombre == "Detalle de Ordenes de Venta" else TIMEOUT_DESCARGA_DEFAULT
-        wait_local = WebDriverWait(driver, 60) if nombre == "Detalle de Ordenes de Venta" else wait_global
+        wait_local     = WebDriverWait(driver, 60) if nombre == "Detalle de Ordenes de Venta" else wait_global
 
         print(f"\n📄 {nombre} → intentos: {intentos_max}, timeout: {timeout_archiv}s")
         exito = False
@@ -146,16 +145,15 @@ def descargar_multiples_reportes():
             fallidos.append(nombre)
 
     if fallidos:
-        with open("errores_descarga.csv", "w", newline='', encoding="utf-8") as f:
+        with open("errores_descarga.csv", "w", newline="", encoding="utf-8") as f:
             csv.writer(f).writerows([[e] for e in fallidos])
         print("⚠️ Ver 'errores_descarga.csv'")
 
 
-def mover_a_drive():
-    print("\n🔄 Moviendo CSV a Drive…")
-    os.makedirs(DESTINO_DRIVE, exist_ok=True)
+def mover_a_directorio():
+    print("\n🔄 Moviendo CSV a carpeta destino…")
     for f in [x for x in os.listdir(DOWNLOAD_DIR) if x.endswith('.csv')]:
-        shutil.move(os.path.join(DOWNLOAD_DIR, f), os.path.join(DESTINO_DRIVE, f))
+        shutil.move(os.path.join(DOWNLOAD_DIR, f), os.path.join(DESTINO_DIR, f))
         print(f"   📁 {f}")
 
 
@@ -171,27 +169,31 @@ def limpiar_duplicados():
         "Ordenes de Compra Abiertas",
         "Catalogo de Productos",
         "ASN",
-        "Orden de Transferencia"
+        "Orden de Transferencia",
     ]
     patron = re.compile(r"^(?P<base>.+?) \((?P<num>\d+)\)\.csv$")
 
     for base in bases:
-        original = f"{base}.csv"
-        archivos = [f for f in os.listdir(DESTINO_DRIVE) if f.startswith(base) and f.endswith('.csv')]
+        original  = f"{base}.csv"
+        archivos  = [f for f in os.listdir(DESTINO_DIR) if f.startswith(base) and f.endswith('.csv')]
         if not archivos:
             continue
+
         if original in archivos:
             for f in archivos:
                 if f != original and patron.match(f):
-                    os.remove(os.path.join(DESTINO_DRIVE, f))
+                    os.remove(os.path.join(DESTINO_DIR, f))
                     print(f"   🗑️ {f}")
         else:
-            duplicados = sorted([f for f in archivos if patron.match(f)], key=lambda x: int(patron.match(x).group('num')))
+            duplicados = sorted(
+                [f for f in archivos if patron.match(f)],
+                key=lambda x: int(patron.match(x).group("num")),
+            )
             conservar = duplicados.pop(0)
-            os.rename(os.path.join(DESTINO_DRIVE, conservar), os.path.join(DESTINO_DRIVE, original))
+            os.rename(os.path.join(DESTINO_DIR, conservar), os.path.join(DESTINO_DIR, original))
             print(f"   🔄 {conservar} ➜ {original}")
             for f in duplicados:
-                os.remove(os.path.join(DESTINO_DRIVE, f))
+                os.remove(os.path.join(DESTINO_DIR, f))
                 print(f"   🗑️ {f}")
     print("✅ Limpieza terminada")
 
@@ -199,7 +201,7 @@ def limpiar_duplicados():
 def ejecutar_proceso():
     iniciar_sesion()
     descargar_multiples_reportes()
-    mover_a_drive()
+    mover_a_directorio()
     limpiar_duplicados()
 
 
